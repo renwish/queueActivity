@@ -3,6 +3,8 @@
 import threading
 import argparse
 from queue import LifoQueue, PriorityQueue, Queue
+from random import randint
+from time import sleep
 
 QUEUE_TYPES = {
     "fifo": Queue,
@@ -44,6 +46,7 @@ PRODUCTS = (
     ":teddy_bear:",
     ":thread:",
     ":yo-yo:",
+)
 
 class Worker(threading.Thread):
     def __init__(self, speed, buffer):
@@ -53,3 +56,62 @@ class Worker(threading.Thread):
         self.product = None
         self.working = False
         self.progress = 0
+
+    @property
+    def state(self):
+        if self.working:
+            return f"{self.product} ({self.progress}%)"
+        return ":zzz: Idle"
+
+    def simulate_idle(self):
+        self.product = None
+        self.working = False
+        self.progress = 0
+        sleep(randint(1, 3))
+
+    def simulate_work(self):
+        self.working = True
+        self.progress = 0
+        delay = randint(1, 1 + 15 // self.speed)
+        for _ in range(100):
+            sleep(delay / 100)
+            self.progress += 1
+
+class Producer(Worker):
+    def __init__(self, speed, buffer, products):
+        super().__init__(speed, buffer)
+        self.products = products
+
+    def run(self):
+        while True:
+            self.product = choice(self.products)
+            self.simulate_work()
+            self.buffer.put(self.product)
+            self.simulate_idle()
+
+class Consumer(Worker):
+    def run(self):
+        while True:
+            self.product = self.buffer.get()
+            self.simulate_work()
+            self.buffer.task_done()
+            self.simulate_idle()
+
+def main(args):
+    buffer = QUEUE_TYPES[args.queue]()
+    producers = [
+        Producer(args.producer_speed, buffer, PRODUCTS)
+        for _ in range(args.producers)
+    ]
+    consumers = [
+        Consumer(args.consumer_speed, buffer) for _ in range(args.consumers)
+    ]
+
+    for producer in producers:
+        producer.start()
+
+    for consumer in consumers:
+        consumer.start()
+
+    view = View(buffer, producers, consumers)
+    view.animate()  
