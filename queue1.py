@@ -122,5 +122,5 @@ def main(args):
     for consumer in consumers:
         consumer.start()
 
-    view = View(buffer, producers, consumers)
+    view = view(buffer, producers, consumers)
     view.animate()  
